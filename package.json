@@ -5,10 +5,10 @@
     "start": "node api/screenshot.js"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^121.0.0",
-    "puppeteer-core": "21.11.0"
+    "@sparticuz/chromium-min": "^119.0.0",
+    "puppeteer-core": "^21.5.2"
   },
   "engines": {
-    "node": "20.x"
+    "node": "18.x"
   }
 }
