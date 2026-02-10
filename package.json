@@ -2,10 +2,14 @@
   "name": "sicredi-pdf-service",
   "version": "1.0.0",
   "scripts": {
-    "start": "node api/screenshot.js"
+    "start": "node api/screenshot.js",
+    "vercel-build": "npm install"
   },
   "dependencies": {
     "@sparticuz/chromium": "^119.0.0",
-    "puppeteer-core": "^21.5.2"
+    "puppeteer-core": "21.5.2"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
