@@ -1,0 +1,11 @@
+{
+  "name": "sicredi-pdf-service",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node api/screenshot.js"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^119.0.0",
+    "puppeteer-core": "^119.0.0"
+  }
+}
