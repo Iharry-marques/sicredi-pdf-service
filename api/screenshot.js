@@ -2,7 +2,7 @@ import chromium from '@sparticuz/chromium-min';
 import puppeteer from 'puppeteer-core';
 
 export default async function handler(req, res) {
-  // Configuração CORS (Mantive igual)
+  // --- Configuração CORS (Padrão) ---
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -15,16 +15,14 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { url, height = 1600, width = 1200 } = req.body;
-
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
   let browser = null;
 
   try {
-    // A MÁGICA ESTÁ AQUI: Apontamos para o arquivo remoto
-    // Isso evita o erro de "libnss3.so" local
+    // ⬇️ AQUI ESTÁ O SEGREDO: Link exato para a versão 123.0.1
     const executablePath = await chromium.executablePath(
-      "https://github.com/Sparticuz/chromium/releases/download/v119.0.0/chromium-v119.0.0-pack.tar"
+      "https://github.com/Sparticuz/chromium/releases/download/v123.0.1/chromium-v123.0.1-pack.tar"
     );
 
     browser = await puppeteer.launch({
@@ -37,13 +35,14 @@ export default async function handler(req, res) {
 
     const page = await browser.newPage();
 
+    // Configura viewport
     await page.setViewport({ 
         width: parseInt(width), 
         height: parseInt(height), 
         deviceScaleFactor: 1 
     });
 
-    // Timeout maior para garantir
+    // Navega (Timeout seguro de 60s)
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
     const file = await page.screenshot({ type: 'png', fullPage: true });
@@ -53,8 +52,8 @@ export default async function handler(req, res) {
     res.end(file);
 
   } catch (error) {
-    console.error("ERRO:", error);
-    res.status(500).json({ error: 'Erro no servidor', details: error.message });
+    console.error("ERRO NO PUPPETEER:", error);
+    res.status(500).json({ error: 'Erro interno ao gerar PDF', details: error.message });
   } finally {
     if (browser) await browser.close();
   }

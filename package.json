@@ -5,8 +5,8 @@
     "start": "node api/screenshot.js"
   },
   "dependencies": {
-    "@sparticuz/chromium-min": "^119.0.0",
-    "puppeteer-core": "^21.5.2"
+    "@sparticuz/chromium-min": "^123.0.1",
+    "puppeteer-core": "^22.6.0"
   },
   "engines": {
     "node": "20.x"
