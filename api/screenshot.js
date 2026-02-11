@@ -1,5 +1,28 @@
+import { list } from '@vercel/blob';
 import chromium from '@sparticuz/chromium-min';
 import puppeteer from 'puppeteer-core';
+
+async function fetchCookies() {
+  try {
+    // Busca o blob mais recente com o prefixo 'cookies/current.json'
+    const { blobs } = await list({ prefix: 'cookies/current.json', limit: 1 });
+    if (!blobs || blobs.length === 0) {
+      console.warn('Nenhum blob de cookies encontrado com prefixo cookies/current.json');
+      return null;
+    }
+
+    // Pega a URL do primeiro (e único) blob encontrado
+    const cookieBlobUrl = blobs[0].url;
+    console.log('Tentando buscar cookies de:', cookieBlobUrl);
+
+    const response = await fetch(cookieBlobUrl);
+    if (!response.ok) throw new Error(`Falha ao buscar cookies: ${response.statusText}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Erro ao buscar cookies do blob:', error);
+    return null;
+  }
+}
 
 export default async function handler(req, res) {
   // CORS Setup
@@ -35,6 +58,26 @@ export default async function handler(req, res) {
     });
 
     const page = await browser.newPage();
+
+    // 🍪 Busca os cookies atualizados do Blob e injeta
+    const cookiesArray = await fetchCookies();
+    if (cookiesArray && cookiesArray.length > 0) {
+      const puppeteerCookies = cookiesArray.map(c => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+        path: c.path || '/',
+        secure: c.secure || false,
+        httpOnly: c.httpOnly || false,
+        sameSite: c.sameSite || 'Lax',
+        expires: c.expirationDate,
+      }));
+      // Filtra cookies inválidos se necessário, mas puppeteer geralmente aceita
+      await page.setCookie(...puppeteerCookies);
+      console.log('✅ Cookies injetados do blob');
+    } else {
+      console.warn('⚠️ Nenhum cookie encontrado no blob, continuando sem cookies...');
+    }
 
     // Viewport
     await page.setViewport({
