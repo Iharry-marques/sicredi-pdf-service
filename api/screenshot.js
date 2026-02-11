@@ -2,30 +2,25 @@ import { list } from '@vercel/blob';
 import chromium from '@sparticuz/chromium-min';
 import puppeteer from 'puppeteer-core';
 
+// Função auxiliar para buscar cookies no Blob
 async function fetchCookies() {
   try {
-    // Busca o blob mais recente com o prefixo 'cookies/current.json'
     const { blobs } = await list({ prefix: 'cookies/current.json', limit: 1 });
     if (!blobs || blobs.length === 0) {
-      console.warn('Nenhum blob de cookies encontrado com prefixo cookies/current.json');
+      console.warn('Nenhum blob de cookies encontrado.');
       return null;
     }
-
-    // Pega a URL do primeiro (e único) blob encontrado
-    const cookieBlobUrl = blobs[0].url;
-    console.log('Tentando buscar cookies de:', cookieBlobUrl);
-
-    const response = await fetch(cookieBlobUrl);
-    if (!response.ok) throw new Error(`Falha ao buscar cookies: ${response.statusText}`);
+    const response = await fetch(blobs[0].url);
+    if (!response.ok) throw new Error('Falha ao buscar cookies');
     return await response.json();
   } catch (error) {
-    console.error('Erro ao buscar cookies do blob:', error);
+    console.error('Erro ao buscar cookies:', error);
     return null;
   }
 }
 
 export default async function handler(req, res) {
-  // CORS Setup
+  // --- Configuração de CORS ---
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -36,22 +31,19 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  // Validação simples
+  // Validação básica
   const { url, width = 1200, height = 1600 } = req.body || {};
-  if (!url) return res.status(400).json({ error: 'URL missing' });
+  if (!url) return res.status(400).json({ error: 'URL is required' });
 
   let browser = null;
 
   try {
-    // URL EXATA do pacote compatível com Node 20 / AL2023
-    // Isso resolve o erro libnss3.so
+    // --- Configuração do Navegador (Versão v141 compatível com Node 20) ---
     const remoteExecutablePath = "https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-pack.x64.tar";
-    // Configuração do binário
-    // await chromium.font('https://raw.githack.com/googlei18n/noto-emoji/master/fonts/NotoColorEmoji.ttf'); // talvez dando erro silencioso
     const executablePath = await chromium.executablePath(remoteExecutablePath);
 
     browser = await puppeteer.launch({
-      args: [...chromium.args, "--hide-scrollbars", "--disable-web-security"],
+      args: [...chromium.args, "--hide-scrollbars", "--disable-web-security", "--font-render-hinting=none"],
       defaultViewport: chromium.defaultViewport,
       executablePath: executablePath,
       headless: chromium.headless,
@@ -59,40 +51,43 @@ export default async function handler(req, res) {
 
     const page = await browser.newPage();
 
-    // 🍪 Busca os cookies atualizados do Blob e injeta
+    // --- Injeção de Cookies (Login) ---
     const cookiesArray = await fetchCookies();
     if (cookiesArray && cookiesArray.length > 0) {
-      const puppeteerCookies = cookiesArray.map(c => ({
+      await page.setCookie(...cookiesArray.map(c => ({
         name: c.name,
         value: c.value,
         domain: c.domain,
         path: c.path || '/',
-        secure: c.secure || false,
-        httpOnly: c.httpOnly || false,
-        sameSite: c.sameSite || 'Lax',
+        secure: c.secure,
+        httpOnly: c.httpOnly,
+        sameSite: c.sameSite,
         expires: c.expirationDate,
-      }));
-      // Filtra cookies inválidos se necessário, mas puppeteer geralmente aceita
-      await page.setCookie(...puppeteerCookies);
-      console.log('✅ Cookies injetados do blob');
+      })));
+      console.log('✅ Cookies injetados com sucesso');
     } else {
-      console.warn('⚠️ Nenhum cookie encontrado no blob, continuando sem cookies...');
+      console.warn('⚠️ Seguindo sem cookies (pode dar erro de acesso)');
     }
 
-    // Viewport
+    // Configura tamanho da tela
     await page.setViewport({
       width: parseInt(width),
       height: parseInt(height),
       deviceScaleFactor: 1
     });
 
-    // Navegação otimizada para evitar timeout
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 50000 });
+    // --- Navegação ---
+    console.log(`Navegando para: ${url}`);
+    // Timeout de 40s para navegação (deixando margem para o wait)
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 40000 });
 
-    const file = await page.screenshot({
-      type: 'png',
-      fullPage: true
-    });
+    // --- O PULO DO GATO (Correção da Tela Branca) ---
+    // Espera explícita de 10 segundos para o JS do Looker Studio desenhar os gráficos
+    console.log('⏳ Aguardando renderização visual (10s)...');
+    await new Promise(r => setTimeout(r, 10000));
+
+    // --- Captura ---
+    const file = await page.screenshot({ type: 'png', fullPage: true });
 
     res.statusCode = 200;
     res.setHeader('Content-Type', 'image/png');
@@ -101,7 +96,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error("ERRO CRÍTICO:", error);
     res.status(500).json({
-      error: 'Falha na geracao',
+      error: 'Erro interno ao gerar PDF',
       details: error.message,
       stack: error.stack
     });
